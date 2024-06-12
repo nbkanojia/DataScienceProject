@@ -30,3 +30,7 @@ The data is collected from Yahoo Finance using the yfinance Python library. It i
 
 ## Metadata
 The dataset includes columns for the date, opening price, closing price, highest price, lowest price, adjusted closing price, and trading volume.
+
+
+## License
+MIT License
