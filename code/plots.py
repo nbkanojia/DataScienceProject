@@ -1,6 +1,7 @@
 # %%
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
+import seaborn as sns
 class PlotHelper(): 
       
 
@@ -41,6 +42,64 @@ class PlotHelper():
         )
 
         fig.show()
+
+    def plot_vpt(self,ticker, df):
+        fig = go.Figure()
+
+        # Plot Adjusted Close Price
+        fig.add_trace(go.Scatter(x=df['Date'], y=df['Adj Close'], mode='lines', name='Adj Close', line=dict(color='blue')))
+
+        df_buy_signals = df[df["VPT Signal"] == 1]
+        df_sell_signals = df[df["VPT Signal"] == -1]
+        
+        fig.add_trace(go.Scatter(x=df_buy_signals['Date'], y=df_buy_signals['Adj Close'], mode='markers', name='Buy Signal',
+                                marker=dict(symbol='triangle-up', size=10, color='green')))
+        fig.add_trace(go.Scatter(x=df_sell_signals['Date'], y=df_sell_signals['Adj Close'], mode='markers', name='Sell Signal',
+                                marker=dict(symbol='triangle-down', size=10, color='red')))
+    
+        
+        #fig.add_trace(go.Scatter(x=df_sell_signals['Date'], y=df_sell_signals['VPT'], name='VPT',mode='lines', line=dict(color='blue')))
+        #fig.add_trace(go.Scatter(x=df_sell_signals['Date'], y=df_sell_signals['VPT EMA Signal Line'],name='Signal Line', mode='lines', line=dict(color='blue')))
+        
+        fig.update_layout(
+            title=f'{ticker} Stock Analysis {"VPT Signal"}',
+            xaxis_title='Date',
+            yaxis_title='Price',
+            legend=dict(x=0, y=1),
+            xaxis=dict(rangeslider=dict(visible=True)),
+            template='plotly_dark',
+            height=600,
+            width=1000
+        )
+
+        fig.show()
+
+        fig = go.Figure()
+
+       
+
+        df_buy_signals = df[df["VPT Signal"] == 1]
+        df_sell_signals = df[df["VPT Signal"] == -1]
+        
+        
+            
+        fig.add_trace(go.Scatter(x=df['Date'], y=df['VPT'], name='VPT',mode='lines', line=dict(color='blue')))
+        fig.add_trace(go.Scatter(x=df['Date'], y=df['VPT EMA Signal Line'],name='Signal Line', mode='lines', line=dict(color='red')))
+        
+        fig.update_layout(
+            title=f'{ticker} Stock Analysis {"VPT Signal"}',
+            xaxis_title='Date',
+            yaxis_title='Price',
+            legend=dict(x=0, y=1),
+            xaxis=dict(rangeslider=dict(visible=True)),
+            template='plotly_dark',
+            height=600,
+            width=1000
+        )
+
+        fig.show()
+        
+
 
     def plot2(self, title, x,y,x_buy,y_buy,x_sell,y_sell):
     
@@ -102,6 +161,26 @@ class PlotHelper():
         plt.ylabel('Price')
         plt.legend()
         plt.grid(True)
+        plt.show()
+
+    def plot_correlation_matrix(self, df):
+        # plot correlation matrix as heatmap
+        plt.figure(figsize=(10,10))
+        sns.set_style("whitegrid")
+        df_cluster2 = df.corr(numeric_only=True)
+        sns.heatmap(df_cluster2,
+                    cmap='RdYlBu',
+                    annot=True,
+                    linewidths=0.2,
+                    linecolor='lightgrey').set_facecolor('white')
+        plt.title("Correlation Analysis")
+        
+    def plot_distribution(self,x_name,df):
+        plt.figure(figsize=(10, 4))
+        sns.countplot(x=x_name, data=df, hue=x_name)
+        plt.title("Distribution of "+ x_name)
+        plt.xlabel(x_name)
+        plt.ylabel("Frequency")
         plt.show()
             
 
