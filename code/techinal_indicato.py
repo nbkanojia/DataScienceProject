@@ -10,7 +10,9 @@ class TechinalIndicatoHelper():
     #calculate weighted moving average
         weights = np.arange(1, window + 1)
         wma = prices.rolling(window).apply(lambda prices: np.dot(prices, weights) / weights.sum(), raw=True)
-        return wma
+        weights2 = np.arange(1, window*2 + 1)
+        wma2 = prices.rolling(window*2).apply(lambda prices: np.dot(prices, weights2) / weights2.sum(), raw=True)
+        return wma, wma2
 
 
    
@@ -62,6 +64,8 @@ class TechinalIndicatoHelper():
         # Generate buy, sell, and neutral signals for WMA
         df['WMA Signal'] = np.where(df['Adj Close'] < df['WMA'], 1,
                                         np.where(df['Adj Close'] > df['WMA'], -1, 0))
+        df['WMA2 Signal'] = np.where(df['Adj Close'] < df['WMA2'], 1,
+                                        np.where(df['Adj Close'] > df['WMA2'], -1, 0))
         
         
         # Generate buy, sell, and neutral signals for RSI
@@ -78,16 +82,23 @@ class TechinalIndicatoHelper():
         df['WMA VPT Signal'] = 0
         df.loc[df['WMA Signal'] == df['VPT Signal'], 'WMA VPT Signal'] = df.loc[df['WMA Signal'] == df['VPT Signal']]['WMA Signal']
 
+        df['WMA VPT RSI Signal'] = 0
+        df.loc[df['RSI Signal'] == df['WMA VPT Signal'], 'WMA VPT RSI Signal'] = df.loc[df['RSI Signal'] == df['WMA VPT Signal']]['RSI Signal']
+
         return df
     
     def apply_techinal_indicators(self, df, window):
     #calculate techinal indicators for givan dataset, with time windows in days
 
-        df['WMA'] = self.__calculate_wma(df['Adj Close'], window)
+        df['WMA'],df['WMA2'] = self.__calculate_wma(df['Adj Close'], window)
         df['RSI'] = self.__calculate_rsi(df['Adj Close'], window)
         df['VPT'],df['VPT EMA Signal Line'] = self.__calculate_vpt(df['Adj Close'],df['Volume'],window)
         #df['PC'] = self.__calculate_percentage_change(df['Adj Close'], window)
-
+        df['adj_close_diff'] = df['Adj Close'].diff()#.dropna()
+        df['RSI_diff'] = df['RSI'].diff()#.dropna()
+        df['WMA_diff'] = df['WMA'].diff()#.dropna()
+        df['VPT_diff'] = df['VPT'].diff()#.dropna()
+        df['VPT EMA Signal Line diff'] = df['VPT EMA Signal Line'].diff()#.dropna()
         #now base on the techinal indicators find the buy, sell and neutral signals
         df = self.__calcualte_signal_by_techinal_indicators(df)
 
