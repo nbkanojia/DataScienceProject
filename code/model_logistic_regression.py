@@ -7,7 +7,7 @@ import yfinancetool as yft
 import techinal_indicato as ti
 from sklearn.model_selection import train_test_split
 import plotly.graph_objects as go
-from sklearn.preprocessing import StandardScaler,MinMaxScaler
+from sklearn.preprocessing import StandardScaler,MinMaxScaler,label_binarize
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import GradientBoostingClassifier
@@ -17,7 +17,7 @@ from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import GridSearchCV
 from sklearn.feature_selection import SelectKBest, chi2
-from sklearn.metrics import auc, precision_score, recall_score, roc_curve
+from sklearn.metrics import auc, precision_score, recall_score, roc_curve,roc_auc_score,precision_recall_curve,f1_score
 from keras.utils import to_categorical
 import tensorflow as tf
 from imblearn.over_sampling import SMOTE
@@ -32,12 +32,12 @@ import kerastuner as kt
 
 class LogisticRegressionHelper(): 
       
-    def predict_signals(model,scaler,df,features):
+    def predict_signals(self,model,scaler,df,features):
 
         df_features = df[features]
         X_test_scaled = scaler.transform(df_features)
         y_pred = model.predict(X_test_scaled)
-        return y_pred
+        return pd.Series(y_pred)
     def train_logistic_regression_model(self, df_train,features, target):
         
         # Create features and target
@@ -45,31 +45,25 @@ class LogisticRegressionHelper():
         target = df_train[target]  # Using SMA Signal as target for this example
 
         # # Split the data
-        X_train, X_test, y_train, y_test = train_test_split(df_features, target, test_size=0.3, random_state=42)
-        print(y_train)
-        return   
+        X_train, X_test, y_train, y_test = train_test_split(df_features, target, test_size=0.4, random_state=42)
+        print("before",y_train.value_counts())
+   
+  
+        print("after",y_train.value_counts())
+
         # Standardize the features
         scaler = StandardScaler()
-        X_train_scaled = scaler.fit_transform(X_train)
+        scaler.fit_transform(df_features)
+        X_train_scaled = scaler.transform(X_train)
         X_test_scaled = scaler.transform(X_test)
 
-        # # Train the logistic regression model
-        # model = LogisticRegression(max_iter=100)
-        # model.fit(X_train_scaled, y_train)
-
-        # # Make predictions
-        # y_pred = model.predict(X_test_scaled)
-
-        # # Evaluate the model
-        # print(confusion_matrix(y_test, y_pred))
-        # print(classification_report(y_test, y_pred))
 
         clf = [
-        LogisticRegression(solver='newton-cg',penalty='l2',max_iter=500),
-        LogisticRegression(solver='lbfgs',penalty='l2',max_iter=500),
-        LogisticRegression(solver='sag',penalty='l2',max_iter=500),
-        LogisticRegression(solver='saga',penalty='l2',max_iter=500),
-        LogisticRegression(solver='liblinear',penalty='l1',max_iter=500)
+        LogisticRegression(solver='newton-cg',penalty='l2',max_iter=200,class_weight='balanced'),
+        LogisticRegression(solver='lbfgs',penalty='l2',max_iter=200,class_weight='balanced'),
+        LogisticRegression(solver='sag',penalty='l2',max_iter=200,class_weight='balanced'),
+        LogisticRegression(solver='saga',penalty='l2',max_iter=200,class_weight='balanced'),
+        LogisticRegression(solver='liblinear',penalty='l1',max_iter=200,class_weight='balanced')
         ]
         clf_columns = []
         clf_compare = pd.DataFrame(columns = clf_columns)
@@ -78,24 +72,27 @@ class LogisticRegressionHelper():
         for alg in clf:
                 
             predicted = alg.fit(X_train_scaled, y_train).predict(X_test_scaled)
-            print("predicted")
-            print(predicted)
-            print("y_test")
-            print(y_test)
+           
+
+
             #fp, tp, th = roc_curve(y_test, predicted)
             clf_name = alg.__class__.__name__
             clf_compare.loc[row_index, 'Train Accuracy'] = round(alg.score(X_train, y_train), 5)
             clf_compare.loc[row_index, 'Test Accuracy'] = round(alg.score(X_test, y_test), 5)
-            clf_compare.loc[row_index, 'Precission'] = round(precision_score(y_test, predicted, average='None'),5)
-            clf_compare.loc[row_index, 'Recall'] = round(recall_score(y_test, predicted, average='None'),5)
+            clf_compare.loc[row_index, 'Precission'] = round(precision_score(y_test, predicted, average='macro'),5)
+            clf_compare.loc[row_index, 'Recall'] = round(recall_score(y_test, predicted, average='macro'),5)
+            clf_compare.loc[row_index, 'f1'] = round(f1_score(y_test, predicted, average='macro'),5)
+          
+            #clf_compare.loc[row_index, 'ROC AUC'] = round(roc_auc_score(y_test, predicted, average='macro'),5)
+           
             #clf_compare.loc[row_index, 'AUC'] = round(auc(fp, tp),5)
 
             row_index+=1
             
-        clf_compare.sort_values(by = ['Test Accuracy'], ascending = False, inplace = True)    
+        clf_compare.sort_values(by = ['f1'], ascending = False, inplace = True)    
         print(clf_compare)
 
-        return clf[0], scaler
+        return clf, scaler
 
 class GradientBoostClassifierHelper(): 
 
@@ -125,22 +122,13 @@ class GradientBoostClassifierHelper():
         sample_weights[y_train == -1] = 0.4
 
         #Define the parameter grid
-        #'learning_rate': 0.2, 'max_depth': 6, 'min_samples_leaf': 4, 'min_samples_split': 2, 'n_estimators': 300, 'subsample': 0.8}
         param_grid = {
             'n_estimators': [200,500,1000], #,[ 1000,2000], #200,500,1000
             'learning_rate': [0.2], #[0.2], #[0.01, 0.1, 0.2]
             'max_depth': [7, 8, 9] #3, 4, 5, [5, 6, 7]    
                 }
         
-    # 'learning_rate': 0.2, 'max_depth': 7, 'n_estimators': 500
-        # param_grid = {
-        #     'n_estimators': [100, 200, 300],
-        #     'learning_rate': [0.05, 0.1, 0.2],
-        #     'max_depth': [3, 4, 5, 6],
-        #     'min_samples_split': [2, 5, 10],
-        #     'min_samples_leaf': [1, 2, 4],
-        #     'subsample': [0.8, 0.9, 1.0]
-        # }
+    
         # Initialize the Gradient Boosting Regressor
         gbm = GradientBoostingClassifier(random_state=42)
 
@@ -374,27 +362,27 @@ The optimal L2 regularization for the Dense layer is {best_hps.get('l2_dense')}.
         print("X_train.shape",X_train.shape)
         print("y_train.shape",y_train.shape)
         #print(X_train[0])
-        self.model.add(BatchNormalization(input_shape=(self.dataset1[0]["X_train"].shape[1], self.dataset1[0]["X_train"].shape[2])))
+        #self.model.add(BatchNormalization(input_shape=(self.dataset1[0]["X_train"].shape[1], self.dataset1[0]["X_train"].shape[2])))
     
-        self.model.add(GRU(1, return_sequences=False, 
-                            #nput_shape=(X_train.shape[1], X_train.shape[2])
-                             kernel_regularizer=l2(0.01)))#, kernel_regularizer=l2(0.001)
+        self.model.add(GRU(50, return_sequences=True, 
+                            input_shape=(X_train.shape[1], X_train.shape[2]),
+                             kernel_regularizer=l2(0.001),recurrent_dropout=0.7,dropout=0.5))#, kernel_regularizer=l2(0.001)
 
-        #self.model.add(Dropout(0.5))
-        #self.model.add(GRU(300, return_sequences=False))
+        self.model.add(Dropout(0.5))
+        self.model.add(GRU(50, return_sequences=False, kernel_regularizer=l2(0.001),recurrent_dropout=0.7,dropout=0.5))
         #self.model.add(Dropout(0.5))
         #self.model.add(Dense(250, kernel_regularizer=l2(0.001)))
        # self.model.add(Dropout(0.5))
-        self.model.add(Dense(3, activation='softmax'))
+        #self.model.add(Dense(3, activation='softmax'))
         #self.model.add(Dropout(0.5))
         # self.model.add(GRU(64, return_sequences=False))
         # self.model.add(BatchNormalization())
         # self.model.add(Dropout(0.5))
         #self.model.add(GRU(64, return_sequences=False, kernel_regularizer=l2(0.001)))# kernel_regularizer=l2(0.001)
         #self.model.add(Dropout(0.5))
-        #self.model.add(Dense(64, kernel_regularizer=l2(0.001), activation='relu'))
+       # self.model.add(Dense(100, kernel_regularizer=l2(0.001), activation='relu'))
         #self.model.add(Input(shape=(X_train.shape[1], X_train.shape[2])))
-        #self.model.add(Dropout(0.5))
+        self.model.add(Dropout(0.5))
 
 
         self.model.add(Dense(3, activation='softmax'))  # 3 classes: sell, neutral, buy
@@ -460,17 +448,31 @@ The optimal L2 regularization for the Dense layer is {best_hps.get('l2_dense')}.
         early_stopping = EarlyStopping(monitor='val_loss', patience=100, restore_best_weights=True)
 
         # Step 4: Train the Model
-        class_weights = {0: 1., 1: 0.01, 2: 1.}
+        class_weights = {0: 100., 1: 1, 2: 100.}
         lr_callback = LearningRateScheduler(self.scheduler)
-        lr_scheduler = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5)
+        lr_scheduler = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=1)
         
+        #Rolling Window Cross-Validation
         n_splits = 3
         tscv = TimeSeriesSplit(n_splits=n_splits)
         #X_undersampled, y_undersampled
-        _X_undersampled_scaled,_ = self.create_train_dataset(X_undersampled_scaled, y_undersampled_encoded, time_step)
-        for train_index, test_index in tscv.split(_X_undersampled_scaled):
-           
-            print(test_index)
+        _X_undersampled_scaled,_y_undersampled_encoded = self.create_train_dataset(X_undersampled_scaled, y_undersampled_encoded, time_step)
+        #for train_index, test_index in tscv.split(_X_undersampled_scaled):
+        initial_window = 100  # Initial training set size
+        step_size = 100  # Step size for expanding the window
+
+        def hv_block_split(X, y, n_splits, gap):
+            tscv = TimeSeriesSplit(n_splits=n_splits)
+            for train_index, test_index in tscv.split(X):
+                train_index = train_index[:-gap]
+                test_index = test_index[gap:]
+                yield train_index, test_index
+        gap = 10
+        n_splits = 5
+        #for start in range(initial_window, len(_X_undersampled_scaled) - step_size, step_size):
+        #    end = start + step_size
+        for train_index, test_index in hv_block_split(_X_undersampled_scaled, _y_undersampled_encoded, n_splits, gap):
+            
             scaler = MinMaxScaler()
             X_undersampled_scaled1 = scaler.fit_transform(X_undersampled)
             print("X_undersampled_scaled1",len(X_undersampled_scaled1))
@@ -482,13 +484,13 @@ The optimal L2 regularization for the Dense layer is {best_hps.get('l2_dense')}.
             X_train, X_test = X_undersampled_scaled1[train_index], X_undersampled_scaled1[test_index]
             y_train, y_test = y_undersampled_encoded[train_index], y_undersampled_encoded[test_index]
 
-            class_weights = class_weight.compute_class_weight(class_weight=None, classes=np.unique((y_undersampled + 1)), y=(y_undersampled + 1))
+            #class_weights = class_weight.compute_class_weight(class_weight=None, classes=np.unique((y_undersampled + 1)), y=(y_undersampled + 1))
 
             # Convert class weights to dictionary for use in training
-            class_weights_dict = {i : class_weights[i] for i in range(len(class_weights))}
+            #class_weights_dict = {i : class_weights[i] for i in range(len(class_weights))}
             
-            history = self.model.fit(X_train, y_train, epochs=20, batch_size=1024, validation_data=(X_test, y_test),  
-                                 callbacks=[early_stopping,lr_scheduler],class_weight=class_weights_dict)#class_weight=class_weights_dict ,
+            history = self.model.fit(X_train, y_train, epochs=1, batch_size=64, validation_data=(X_test, y_test),  
+                                 callbacks=[early_stopping,lr_scheduler],class_weight=class_weights)#class_weight=class_weights_dict ,
             # Evaluate model
             val_accuracy = self.model.evaluate(X_test, y_test, verbose=0)[1]
             print(f"Validation Accuracy: {val_accuracy}")

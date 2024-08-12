@@ -29,18 +29,6 @@ class TechinalIndicatoHelper():
         rsi = 100 - (100 / (1 + rs))
         return rsi
 
-    def __calculate_percentage_change(self,prices, window):
-
-        pc = []
-        
-        for i in range(len(prices)):
-            if i < window:
-                pc.append(pd.NA)
-            else:
-                start_price = prices[i - window]
-                end_price = prices[i]
-                pc.append((end_price - start_price) / start_price * 100)
-        return pc
 
     def __calculate_ema(self,series, span):
     #calculate exponential moving average
@@ -99,6 +87,15 @@ class TechinalIndicatoHelper():
         df['WMA_diff'] = df['WMA'].diff()#.dropna()
         df['VPT_diff'] = df['VPT'].diff()#.dropna()
         df['VPT EMA Signal Line diff'] = df['VPT EMA Signal Line'].diff()#.dropna()
+        df['Volume diff'] = df['Volume'].diff()#.dropna()
+
+        df['adj_close_pct_change'] = df['Adj Close'].pct_change()* 100  # Percentage change
+        df['WMA_pct_change'] = df['WMA'].pct_change()* 100 # Percentage change
+        df['RSI_pct_change'] = df['RSI'].pct_change()* 100 # Percentage change
+        df['VPT_pct_change'] = df['VPT'].pct_change()* 100 # Percentage change
+        df['VPT_signal_pct_change'] = df['VPT EMA Signal Line'].pct_change()* 100 # Percentage change
+        df['Volume_pct_change'] = df['Volume'].pct_change()* 100
+
         #now base on the techinal indicators find the buy, sell and neutral signals
         df = self.__calcualte_signal_by_techinal_indicators(df)
 
