@@ -8,7 +8,7 @@ import techinal_indicato as ti
 from sklearn.model_selection import train_test_split
 import plotly.graph_objects as go
 from sklearn.preprocessing import StandardScaler,MinMaxScaler,label_binarize
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix,make_scorer, precision_score, recall_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import GradientBoostingClassifier
 from tensorflow.keras.models import Sequential
@@ -21,7 +21,7 @@ from sklearn.metrics import auc, precision_score, recall_score, roc_curve,roc_au
 from keras.utils import to_categorical
 import tensorflow as tf
 from imblearn.over_sampling import SMOTE
-from sklearn.utils import class_weight
+from sklearn.utils import class_weight,compute_sample_weight
 from tensorflow.keras.callbacks import EarlyStopping, LearningRateScheduler,ReduceLROnPlateau
 from tensorflow.keras.regularizers import l2
 from sklearn.utils import resample
@@ -46,24 +46,20 @@ class LogisticRegressionHelper():
 
         # # Split the data
         X_train, X_test, y_train, y_test = train_test_split(df_features, target, test_size=0.4, random_state=42)
-        print("before",y_train.value_counts())
-   
-  
-        print("after",y_train.value_counts())
-
+       
         # Standardize the features
         scaler = StandardScaler()
         scaler.fit_transform(df_features)
         X_train_scaled = scaler.transform(X_train)
         X_test_scaled = scaler.transform(X_test)
-
+        c=0.1
 
         clf = [
-        LogisticRegression(solver='newton-cg',penalty='l2',max_iter=200,class_weight='balanced'),
-        LogisticRegression(solver='lbfgs',penalty='l2',max_iter=200,class_weight='balanced'),
-        LogisticRegression(solver='sag',penalty='l2',max_iter=200,class_weight='balanced'),
-        LogisticRegression(solver='saga',penalty='l2',max_iter=200,class_weight='balanced'),
-        LogisticRegression(solver='liblinear',penalty='l1',max_iter=200,class_weight='balanced')
+        LogisticRegression(solver='newton-cg',penalty='l2',max_iter=200,C=c,class_weight='balanced'),
+        LogisticRegression(solver='lbfgs',penalty='l2',max_iter=200,C=c,class_weight='balanced'),
+        LogisticRegression(solver='sag',penalty='l2',max_iter=200,C=c,class_weight='balanced'),
+        LogisticRegression(solver='saga',penalty='l2',max_iter=200,C=c,class_weight='balanced'),
+        LogisticRegression(solver='liblinear',penalty='l1',max_iter=200,C=c,class_weight='balanced')
         ]
         clf_columns = []
         clf_compare = pd.DataFrame(columns = clf_columns)
@@ -96,14 +92,16 @@ class LogisticRegressionHelper():
 
 class GradientBoostClassifierHelper(): 
 
-    def predict_signals(model,scaler,df,features):
+    def predict_signals(self,model,scaler,df,features):
 
         df_features = df[features]
         X_test_scaled = scaler.transform(df_features)
         y_pred = model.predict(X_test_scaled)
-        return y_pred
+        return pd.Series(y_pred)
     def train_gradient_classifier_model(self, df_train,features, target):
         #    https://stackoverflow.com/questions/56505564/handling-unbalanced-data-in-gradientboostingclassifier-using-weighted-class
+        #    https://www.kaggle.com/code/alperengin/custom-scoring-using-scikit-learn-make-scorer
+        #    https://scikit-learn.org/stable/modules/generated/sklearn.metrics.make_scorer.html
         # Create features and target
         df_features = df_train[features]
         target = df_train[target]  # Using SMA Signal as target for this example
@@ -115,30 +113,31 @@ class GradientBoostClassifierHelper():
         scaler = StandardScaler()
         X_train_scaled = scaler.fit_transform(X_train)
         X_test_scaled = scaler.transform(X_test)
-        
-        sample_weights = np.zeros(len(y_train))
-        sample_weights[y_train == 0] = 0.2
-        sample_weights[y_train == 1] = 0.4
-        sample_weights[y_train == -1] = 0.4
+
+       
 
         #Define the parameter grid
         param_grid = {
-            'n_estimators': [200,500,1000], #,[ 1000,2000], #200,500,1000
-            'learning_rate': [0.2], #[0.2], #[0.01, 0.1, 0.2]
-            'max_depth': [7, 8, 9] #3, 4, 5, [5, 6, 7]    
+            'n_estimators': [10,100,150], #,[ 1000,2000], #200,500,1000
+            'learning_rate': [0.0001,0.001,0.01], #[0.2], #[0.01, 0.1, 0.2]
+            'max_depth': [7,8,9,10,12], #3, 4, 5, [5, 6, 7]    
+           
                 }
+      
         
-    
+         
         # Initialize the Gradient Boosting Regressor
         gbm = GradientBoostingClassifier(random_state=42)
 
         # Initialize GridSearchCV
         grid_search = GridSearchCV(estimator=gbm, param_grid=param_grid)
 
-        class_weight = y_train.value_counts(normalize=True).to_dict()
-        sample_weight = y_train.map(lambda x: 1/class_weight[x])
+        # The GradientBoostingClassifier in scikit-learn does not directly support the class_weight
+        #class_weight = y_train.value_counts(normalize=True).to_dict()
+        #sample_weight = y_train.map(lambda x: 1/class_weight[x])
+        sample_weight = compute_sample_weight(class_weight='balanced', y=y_train)
         # Fit GridSearchCV
-        grid_search.fit(X_train_scaled, y_train, sample_weight = sample_weight)
+        grid_search.fit(X_train_scaled, y_train ,sample_weight = sample_weight)#
 
         # Get the best parameters
         best_params = grid_search.best_params_
@@ -153,6 +152,13 @@ class GradientBoostClassifierHelper():
         # Evaluate the model
         mse = mean_squared_error(y_test, y_pred)
         print(f'Mean Squared Error after tuning: {mse}')
+        print(f'Train Accuracy: {round(best_gbm.score(X_train, y_train), 5)}')
+        print(f'Test Accuracy: {round(best_gbm.score(X_test, y_test), 5)}')
+        print(f'Precission: {round(precision_score(y_test, y_pred, average='macro'), 5)}')
+        print(f'Recall: {round(recall_score(y_test, y_pred, average='macro'), 5)}')
+        print(f'f1: {round(f1_score(y_test, y_pred, average='macro'), 5)}')
+
+                
         return best_gbm, scaler
 
 class LongShortTermMemoryMLHelper(): 
@@ -259,23 +265,7 @@ The optimal dropout rates are {[best_hps.get(f'dropout_{i}') for i in range(best
 The optimal L2 regularization values are {[best_hps.get(f'l2_{i}') for i in range(best_hps.get('num_layers'))]}.
 The optimal L2 regularization for the Dense layer is {best_hps.get('l2_dense')}.
 """)
-        # print(f"""
-        # The optimal number of units in the LSTM layer 1 is {best_hps.get('units1')}.
-        #   The optimal number of units in the LSTM layer 2 is {best_hps.get('units2')}.
-        #     The optimal number of units in the LSTM layer 3 is {best_hps.get('units3')}.
-        #       The optimal number of units in the LSTM layer 4 is {best_hps.get('units4')}.
-  
-        # The optimal dropout1 rate is {best_hps.get('dropout1')}.
-        #   The optimal dropout2 rate is {best_hps.get('dropout2')}.
-        #     The optimal dropout3 rate is {best_hps.get('dropout3')}.
-        #       The optimal dropout4 rate is {best_hps.get('dropout4')}.
-
-        # The optimal L2 regularization for the LSTM layer 1 is {best_hps.get('l2_1')}.
-        # The optimal L2 regularization for the Dense layer 2 is {best_hps.get('l2_2')}.
-        #  The optimal L2 regularization for the Dense layer 3 is {best_hps.get('l2_3')}.
-        #   The optimal L2 regularization for the Dense layer 4 is {best_hps.get('l2_4')}.
-        #    The optimal L2 regularization for the Dense layer 5 is {best_hps.get('l2_5')}.
-        # """)
+       
         # Build the best model
         self.model = tuner.hypermodel.build(best_hps)
 
@@ -304,30 +294,6 @@ The optimal L2 regularization for the Dense layer is {best_hps.get('l2_dense')}.
         plt.show()
 
     def train_lstm_model(self, df_train,features, target, time_step=28):
-        # df_features = df_train[features]
-        # df_target = df_train[target]  # Using SMA Signal as target for this example
-        
-
-        
-        # #sm = SMOTE(random_state=42)
-        # #df_features, df_target = sm.fit_resample(df_features, df_target)
-
-     
-        # #print(one_hot_labels)
-        # #X_train, X_test, y_train, y_test = train_test_split(df_features, target, test_size=0.3, random_state=42)
-
-        # self.scaler = StandardScaler() #MinMaxScaler()
-        # X_train_scaled = self.scaler.fit_transform(df_features)
-
-        # #shift from -1,0,1 to 0,1,2
-        # shifted_class_vector = df_target + 1
-        # # One hot encode the labels
-        # one_hot_labels = to_categorical(shifted_class_vector,num_classes = 3)
-        # X, y = self.create_train_dataset(X_train_scaled, one_hot_labels, time_step)
-
-
-      
-
 
 
         X_train, X_test, y_train, y_test,X_undersampled_scaled, y_undersampled_encoded,X_undersampled, y_undersampled = self.combine_dataset(df_train,time_step)#self.under_sample(df_train,features, target,self.scaler) 
@@ -359,18 +325,18 @@ The optimal L2 regularization for the Dense layer is {best_hps.get('l2_dense')}.
 
         # Build the LSTM model (over fitting)
         self.model = Sequential()
-        print("X_train.shape",X_train.shape)
-        print("y_train.shape",y_train.shape)
+        #print("X_train.shape",X_train.shape)
+        #print("y_train.shape",y_train.shape)
         #print(X_train[0])
         #self.model.add(BatchNormalization(input_shape=(self.dataset1[0]["X_train"].shape[1], self.dataset1[0]["X_train"].shape[2])))
     
-        self.model.add(GRU(50, return_sequences=True, 
+        self.model.add(LSTM(15, return_sequences=True, 
                             input_shape=(X_train.shape[1], X_train.shape[2]),
                              kernel_regularizer=l2(0.001),recurrent_dropout=0.7,dropout=0.5))#, kernel_regularizer=l2(0.001)
 
         self.model.add(Dropout(0.5))
-        self.model.add(GRU(50, return_sequences=False, kernel_regularizer=l2(0.001),recurrent_dropout=0.7,dropout=0.5))
-        #self.model.add(Dropout(0.5))
+        self.model.add(LSTM(15, return_sequences=False, kernel_regularizer=l2(0.001),recurrent_dropout=0.7,dropout=0.5))
+        self.model.add(Dropout(0.5))
         #self.model.add(Dense(250, kernel_regularizer=l2(0.001)))
        # self.model.add(Dropout(0.5))
         #self.model.add(Dense(3, activation='softmax'))
@@ -380,9 +346,9 @@ The optimal L2 regularization for the Dense layer is {best_hps.get('l2_dense')}.
         # self.model.add(Dropout(0.5))
         #self.model.add(GRU(64, return_sequences=False, kernel_regularizer=l2(0.001)))# kernel_regularizer=l2(0.001)
         #self.model.add(Dropout(0.5))
-       # self.model.add(Dense(100, kernel_regularizer=l2(0.001), activation='relu'))
+        #self.model.add(Dense(10, kernel_regularizer=l2(0.001), activation='relu'))
         #self.model.add(Input(shape=(X_train.shape[1], X_train.shape[2])))
-        self.model.add(Dropout(0.5))
+        #self.model.add(Dropout(0.5))
 
 
         self.model.add(Dense(3, activation='softmax'))  # 3 classes: sell, neutral, buy
@@ -439,18 +405,18 @@ The optimal L2 regularization for the Dense layer is {best_hps.get('l2_dense')}.
         #                       return_sequences=True,input_shape=(X_train.shape[1], X_train.shape[2])))
                 
         # Compile the model
-        self.model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+        self.model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['precision','recall'])
         #model.summary()
 
         # Use SMOTE to oversample the minority classes
         
         # Early stopping callback
-        early_stopping = EarlyStopping(monitor='val_loss', patience=100, restore_best_weights=True)
+        early_stopping = EarlyStopping(monitor='val_precision', mode='max',  patience=5, restore_best_weights=True)
 
         # Step 4: Train the Model
-        class_weights = {0: 100., 1: 1, 2: 100.}
+    
         lr_callback = LearningRateScheduler(self.scheduler)
-        lr_scheduler = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=1)
+        lr_scheduler = ReduceLROnPlateau(monitor='val_precision', factor=0.5, patience=1)
         
         #Rolling Window Cross-Validation
         n_splits = 3
@@ -458,8 +424,8 @@ The optimal L2 regularization for the Dense layer is {best_hps.get('l2_dense')}.
         #X_undersampled, y_undersampled
         _X_undersampled_scaled,_y_undersampled_encoded = self.create_train_dataset(X_undersampled_scaled, y_undersampled_encoded, time_step)
         #for train_index, test_index in tscv.split(_X_undersampled_scaled):
-        initial_window = 100  # Initial training set size
-        step_size = 100  # Step size for expanding the window
+        initial_window = 365*2  # Initial training set size
+        step_size = 365  # Step size for expanding the window
 
         def hv_block_split(X, y, n_splits, gap):
             tscv = TimeSeriesSplit(n_splits=n_splits)
@@ -467,42 +433,86 @@ The optimal L2 regularization for the Dense layer is {best_hps.get('l2_dense')}.
                 train_index = train_index[:-gap]
                 test_index = test_index[gap:]
                 yield train_index, test_index
+        n_splits = 4
         gap = 10
-        n_splits = 5
+       
+        #for start in range(initial_window, len(_X_undersampled_scaled) - step_size, step_size):
+        #    end = start + step_size
+        #class_weightss = pd.Series(np.argmax(_y_undersampled_encoded, axis=1)).value_counts().to_dict()
+        #sample_weight =  pd.Series(np.argmax(_y_undersampled_encoded, axis=1)).map(lambda x: 1/class_weightss[x])
+        #print("class_weightss", pd.Series(np.argmax(_y_undersampled_encoded, axis=1)).value_counts().to_dict())
+        tmp_y_undersampled = pd.Series(y_undersampled+1)
+        class_weights = class_weight.compute_class_weight(class_weight='balanced', classes=np.unique(tmp_y_undersampled), y=tmp_y_undersampled)
+        total_class_weight = class_weights.sum()
+        class_weights_dict = {i : (class_weights[i]/total_class_weight) for i in range(len(class_weights))}
+        print("class_weights_dict",class_weights_dict)
+        scaler = StandardScaler()
+        X_undersampled_scaled1 = scaler.fit_transform(X_undersampled)
+        y_undersampled_encoded = to_categorical(y_undersampled + 1,num_classes = 3)  # Shift target values from [-1, 0, 1] to [0, 1, 2]
+        X_undersampled_scaled1,y_undersampled_encoded = self.create_train_dataset(X_undersampled_scaled1, y_undersampled_encoded, time_step)
+        #for train_index, test_index in tscv.split(_X_undersampled_scaled):
         #for start in range(initial_window, len(_X_undersampled_scaled) - step_size, step_size):
         #    end = start + step_size
         for train_index, test_index in hv_block_split(_X_undersampled_scaled, _y_undersampled_encoded, n_splits, gap):
             
-            scaler = MinMaxScaler()
-            X_undersampled_scaled1 = scaler.fit_transform(X_undersampled)
-            print("X_undersampled_scaled1",len(X_undersampled_scaled1))
-            print("y_undersampled_encoded",len(y_undersampled_encoded))
-            y_undersampled_encoded = to_categorical(y_undersampled + 1,num_classes = 3)  # Shift target values from [-1, 0, 1] to [0, 1, 2]
-            X_undersampled_scaled1,y_undersampled_encoded = self.create_train_dataset(X_undersampled_scaled1, y_undersampled_encoded, time_step)
+            
+           # print("X_undersampled_scaled1",len(X_undersampled_scaled1))
+            #print("y_undersampled_encoded",len(y_undersampled_encoded))
+           
 
 
-            X_train, X_test = X_undersampled_scaled1[train_index], X_undersampled_scaled1[test_index]
-            y_train, y_test = y_undersampled_encoded[train_index], y_undersampled_encoded[test_index]
+            X_train_inner, X_test_inner = X_undersampled_scaled1[train_index], X_undersampled_scaled1[test_index]
+            y_train_inner, y_test_inner = y_undersampled_encoded[train_index], y_undersampled_encoded[test_index]
+            
+            #X_train_inner, X_test_inner = X_undersampled_scaled1[:start,:], X_undersampled_scaled1[start:end,:]
+            #y_train_inner, y_test_inner = y_undersampled_encoded[:start,:], y_undersampled_encoded[start:end,:]
+
+            #X_train_inner, X_test_inner = X_undersampled_scaled1[train_index], X_undersampled_scaled1[test_index]
+            #y_train_inner, y_test_inner = y_undersampled_encoded[train_index], y_undersampled_encoded[test_index]
 
             #class_weights = class_weight.compute_class_weight(class_weight=None, classes=np.unique((y_undersampled + 1)), y=(y_undersampled + 1))
 
             # Convert class weights to dictionary for use in training
             #class_weights_dict = {i : class_weights[i] for i in range(len(class_weights))}
-            
-            history = self.model.fit(X_train, y_train, epochs=1, batch_size=64, validation_data=(X_test, y_test),  
-                                 callbacks=[early_stopping,lr_scheduler],class_weight=class_weights)#class_weight=class_weights_dict ,
+           
+            #print(sample_weight)
+            # https://www.tensorflow.org/api_docs/python/tf/keras/Model
+            history = self.model.fit(X_train_inner, y_train_inner, epochs=100, batch_size=64, validation_data=(X_test_inner, y_test_inner),  
+                                 callbacks=[early_stopping,lr_scheduler],class_weight=class_weights_dict)#class_weight=class_weights_dict ,
+            y_pred = self.model.predict(X_test_inner)
+            y_pred_classes = np.argmax(y_pred, axis=1)
+            shifted_class_vector_y_pred = y_pred_classes - 1
             # Evaluate model
-            val_accuracy = self.model.evaluate(X_test, y_test, verbose=0)[1]
-            print(f"Validation Accuracy: {val_accuracy}")
+            # https://keras.io/api/models/model_training_apis/#evaluate-method
+            val_accuracy = self.model.evaluate(X_test_inner, y_test_inner, verbose=0)
+            print(val_accuracy)
+            print(f"Validation Accuracy: {val_accuracy[1]}")
+            #print(f'Train Accuracy: {round(self.model.score(X_train_inner, y_train_inner), 5)}')
+            #print(f'Test Accuracy: {round(self.model.score(X_test_inner, shifted_class_vector_y_pred), 5)}')
+
+            print(f'Precission: {round(precision_score( np.argmax(y_test_inner, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
+            print(f'Recall: {round(recall_score(np.argmax(y_test_inner, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
+            print(f'f1: {round(f1_score(np.argmax(y_test_inner, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
+            # print("Precission: " + round(precision_score(y_test, y_pred, average='macro')))
+            # print("Recall: " + round(recall_score(y_test, y_pred, average='macro')))
+            # print("f1: " + round(f1_score(y_test, y_pred, average='macro')))
+
 
         # Step 5: Evaluate and Predict
         y_pred = self.model.predict(X_test)
         #get class with heighest probability
         y_pred_classes = np.argmax(y_pred, axis=1)
-        y_test_classes = np.argmax(y_test, axis=1)
-        #back 0,1,2 to -1,0,1
         shifted_class_vector_y_pred = y_pred_classes - 1
-        shifted_class_vector_y_test = y_test_classes - 1
+        #y_test_classes = np.argmax(y_test, axis=1)
+        print(f'Final Precission: {round(precision_score( np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
+        print(f'Final Recall: {round(recall_score(np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
+        print(f'Final f1: {round(f1_score(np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
+        return  self.model, scaler
+       
+
+        #back 0,1,2 to -1,0,1
+        #shifted_class_vector_y_pred = y_pred_classes - 1
+       # shifted_class_vector_y_test = y_test_classes - 1
         #print("-----------predicated----")
         #print(pd.Series(shifted_class_vector_y_pred).value_counts())
         #print("----------test actual-----")
@@ -511,29 +521,42 @@ The optimal L2 regularization for the Dense layer is {best_hps.get('l2_dense')}.
         #SSSSprint(y_test_classes)
         # Plot actual vs predicted signals
 
-        # Plot training and validation loss
-        plt.plot(history.history['loss'], label='Training Loss')
-        plt.plot(history.history['val_loss'], label='Validation Loss')
-        plt.title('Training and Validation Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.legend()
-        #plt.xticks(np.arange(0, len(history.history['loss'])+1, 1.0))
-        plt.show()
+        # # Plot training and validation loss
+        # plt.plot(history.history['loss'], label='Training Loss')
+        # plt.plot(history.history['val_loss'], label='Validation Loss')
+        # plt.title('Training and Validation Loss')
+        # plt.xlabel('Epoch')
+        # plt.ylabel('Loss')
+        # plt.legend()
+        # #plt.xticks(np.arange(0, len(history.history['loss'])+1, 1.0))
+        # plt.show()
 
         
-        plt.plot(history.history['accuracy'], label='train')
-        plt.plot(history.history['val_accuracy'], label='test')
-        plt.title('Training and Validation Accuracy')
-        plt.xlabel('Epoch')
-        plt.ylabel('Accuracy')
-        plt.legend()
-        plt.show()
+        # plt.plot(history.history['precision'], label='precision')
+        # plt.plot(history.history['recall'], label='recall')
+        # plt.title('Training and Validation Accuracy')
+        # plt.xlabel('Epoch')
+        # plt.ylabel('Accuracy')
+        # plt.legend()
+        # plt.show()
 
 
         # # return self.model, self.scaler
         #return 1, 2
-    def predict_signals(self,ticker,df,features):
+    def predict_signals(self,model,scaler,df,features):
+
+        df_features = df[features]
+
+        X_test_scaled = scaler.transform(df_features)
+        X_test_scaled_new = self.create_test_dataset(X_test_scaled)
+        y_pred = model.predict(X_test_scaled_new)
+        #get class with heighest probability
+        y_pred_classes = np.argmax(y_pred, axis=1)
+         #back 0,1,2 to -1,0,1
+        shifted_class_vector_y_pred = y_pred_classes - 1
+        return pd.Series(shifted_class_vector_y_pred)
+    
+    def predict_signals2(self,ticker,df,features):
         df_features = df[features]
 
         for i in range(len(self.dataset1)):
@@ -688,7 +711,7 @@ The optimal L2 regularization for the Dense layer is {best_hps.get('l2_dense')}.
         #print("before", X_train.shape)
         #X_train,y_train = self.create_train_dataset(X_train, y_train, time_step)
         #X_test, y_test = self.create_train_dataset(X_test, y_test, time_step)
-        print("after", X_train.shape)
+       # print("after", X_train.shape)
 
         return  X_train, X_test, y_train, y_test, X_undersampled_scaled, y_undersampled_encoded, X_undersampled, y_undersampled
     def combine_dataset(self,tickerlist,time_step):

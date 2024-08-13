@@ -14,21 +14,14 @@ class PlotHelper():
 
         if signal == "WMA Signal":
             fig.add_trace(go.Scatter(x=df['Date'], y=df['WMA'], mode='lines', name='WMA', line=dict(color='orange')))
-        elif signal == "SMA Signal":
-            fig.add_trace(go.Scatter(x=df['Date'], y=df['SMA'], mode='lines', name='SMA', line=dict(color='orange')))
-        elif signal == "RSI Signal":
-            fig.add_trace(go.Scatter(x=df['Date'], y=df['RSI'], mode='lines', name='RSI', line=dict(color='orange')))
-        elif signal == "BB Signal":
-            fig.add_trace(go.Scatter(x=df['Date'], y=df['BUB'], mode='lines', name='BUB', line=dict(color='orange')))
-            fig.add_trace(go.Scatter(x=df['Date'], y=df['BLB'], mode='lines', name='BLB', line=dict(color='orange')))
-
+      
         df_buy_signals = df[df[signal] == 1]
         df_sell_signals = df[df[signal] == -1]
         
         fig.add_trace(go.Scatter(x=df_buy_signals['Date'], y=df_buy_signals['Adj Close'], mode='markers', name='Buy Signal',
-                                marker=dict(symbol='triangle-up', size=10, color='green')))
+                                marker=dict(symbol='triangle-up', size=7, color='green')))
         fig.add_trace(go.Scatter(x=df_sell_signals['Date'], y=df_sell_signals['Adj Close'], mode='markers', name='Sell Signal',
-                                marker=dict(symbol='triangle-down', size=10, color='red')))
+                                marker=dict(symbol='triangle-down', size=7, color='red')))
         
         fig.update_layout(
             title=f'{ticker} Stock Analysis {signal}',
@@ -42,6 +35,7 @@ class PlotHelper():
         )
 
         fig.show()
+    
 
     def plot_vpt(self,ticker, df):
         fig = go.Figure()
@@ -53,9 +47,9 @@ class PlotHelper():
         df_sell_signals = df[df["VPT Signal"] == -1]
         
         fig.add_trace(go.Scatter(x=df_buy_signals['Date'], y=df_buy_signals['Adj Close'], mode='markers', name='Buy Signal',
-                                marker=dict(symbol='triangle-up', size=10, color='green')))
+                                marker=dict(symbol='triangle-up', size=7, color='green')))
         fig.add_trace(go.Scatter(x=df_sell_signals['Date'], y=df_sell_signals['Adj Close'], mode='markers', name='Sell Signal',
-                                marker=dict(symbol='triangle-down', size=10, color='red')))
+                                marker=dict(symbol='triangle-down', size=7, color='red')))
     
         
         #fig.add_trace(go.Scatter(x=df_sell_signals['Date'], y=df_sell_signals['VPT'], name='VPT',mode='lines', line=dict(color='blue')))

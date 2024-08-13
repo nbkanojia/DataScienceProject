@@ -17,8 +17,8 @@ class TechinalIndicatoHelper():
 
    
     def __calculate_rsi(self,prices, window):
-     #calculate Relative Strength Index (RSI)
-        #https://www.investopedia.com/terms/r/rsi.asp
+    #calculate Relative Strength Index (RSI)
+    #https://www.investopedia.com/terms/r/rsi.asp
 
         delta = prices.diff()
         gain = delta.where(delta > 0, 0)
@@ -81,7 +81,7 @@ class TechinalIndicatoHelper():
         df['WMA'],df['WMA2'] = self.__calculate_wma(df['Adj Close'], window)
         df['RSI'] = self.__calculate_rsi(df['Adj Close'], window)
         df['VPT'],df['VPT EMA Signal Line'] = self.__calculate_vpt(df['Adj Close'],df['Volume'],window)
-        #df['PC'] = self.__calculate_percentage_change(df['Adj Close'], window)
+   
         df['adj_close_diff'] = df['Adj Close'].diff()#.dropna()
         df['RSI_diff'] = df['RSI'].diff()#.dropna()
         df['WMA_diff'] = df['WMA'].diff()#.dropna()
@@ -89,12 +89,13 @@ class TechinalIndicatoHelper():
         df['VPT EMA Signal Line diff'] = df['VPT EMA Signal Line'].diff()#.dropna()
         df['Volume diff'] = df['Volume'].diff()#.dropna()
 
-        df['adj_close_pct_change'] = df['Adj Close'].pct_change()* 100  # Percentage change
-        df['WMA_pct_change'] = df['WMA'].pct_change()* 100 # Percentage change
-        df['RSI_pct_change'] = df['RSI'].pct_change()* 100 # Percentage change
-        df['VPT_pct_change'] = df['VPT'].pct_change()* 100 # Percentage change
-        df['VPT_signal_pct_change'] = df['VPT EMA Signal Line'].pct_change()* 100 # Percentage change
-        df['Volume_pct_change'] = df['Volume'].pct_change()* 100
+        df['adj_close_pct_change'] = df['Adj Close'].pct_change() # Percentage change
+        df['WMA_pct_change'] = df['WMA'].pct_change() # Percentage change
+        df['RSI_pct_change'] = df['RSI'].pct_change() # Percentage change
+        df['VPT_pct_change'] = df['VPT'].pct_change() # Percentage change
+        df['VPT_signal_pct_change'] = df['VPT EMA Signal Line'].pct_change() # Percentage change
+        df['Volume_pct_change'] = df['Volume'].pct_change()
+        
 
         #now base on the techinal indicators find the buy, sell and neutral signals
         df = self.__calcualte_signal_by_techinal_indicators(df)
