@@ -2,6 +2,7 @@
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import seaborn as sns
+from sklearn.metrics import confusion_matrix
 class PlotHelper(): 
       
 
@@ -95,30 +96,6 @@ class PlotHelper():
         
 
 
-    def plot2(self, title, x,y,x_buy,y_buy,x_sell,y_sell):
-    
-        fig = go.Figure()
-
-        # Plot Adjusted Close Price
-        fig.add_trace(go.Scatter(x=x, y=y, mode='lines', name='Adj Close', line=dict(color='blue')))
-        
-        fig.add_trace(go.Scatter(x=x_buy, y=y_buy, mode='markers', name='Buy Signal',
-                                marker=dict(symbol='triangle-up', size=10, color='green')))
-        fig.add_trace(go.Scatter(x=x_sell, y=y_sell, mode='markers', name='Sell Signal',
-                                marker=dict(symbol='triangle-down', size=10, color='red')))
-        
-        fig.update_layout(
-            title=f'{title} Stock Analysis',
-            xaxis_title='Date',
-            yaxis_title='Price',
-            legend=dict(x=0, y=1),
-            xaxis=dict(rangeslider=dict(visible=True)),
-            template='plotly_dark',
-            height=600,
-            width=1000
-        )
-
-        fig.show()
             
     def plot_profit(ticker,signal,df,entry_date,exit_date):
     
@@ -168,6 +145,20 @@ class PlotHelper():
                     linewidths=0.2,
                     linecolor='lightgrey').set_facecolor('white')
         plt.title("Correlation Analysis")
+
+    def plot_confusion_matrix(self, y_test, y_pred):
+        # plot correlation matrix as heatmap
+        conf_matrix = confusion_matrix(y_test, y_pred)
+        print(conf_matrix)
+        # Plot the confusion matrix using seaborn
+        plt.figure(figsize=(8, 6), dpi=100)
+        sns.set(font_scale=1.1)
+        labels = ["Sell(-1)", "Neutral(0)", "Buy(1)"] 
+        ax = sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels, cbar=False )
+        ax.set_xlabel("Predicted Class")
+        ax.set_ylabel("True Class")
+        ax.set_title("Confusion Matrix for the Iris Classification Model")
+        plt.show()
         
     def plot_distribution(self,x_name,df):
         plt.figure(figsize=(10, 4))
