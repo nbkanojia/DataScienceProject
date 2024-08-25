@@ -8,7 +8,7 @@ import techinal_indicato as ti
 from sklearn.model_selection import train_test_split
 import plotly.graph_objects as go
 from sklearn.preprocessing import StandardScaler,MinMaxScaler,label_binarize
-from sklearn.metrics import classification_report, confusion_matrix,make_scorer, precision_score, recall_score
+from sklearn.metrics import classification_report, confusion_matrix,make_scorer, precision_score, recall_score, accuracy_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import GradientBoostingClassifier
 from tensorflow.keras.models import Sequential
@@ -43,6 +43,15 @@ class LogisticRegressionHelper():
         X_test_scaled = scaler.transform(df_features)
         y_pred = model.predict(X_test_scaled)
         return pd.Series(y_pred)
+    def predict_signals_from_saved_model(self,df,features):
+        with open('scaler_lr.pkl','rb') as f:
+            scaler = pickle.load(f)
+        with open('best_logistic_model.pkl', 'rb') as file:
+            model = pickle.load(file)
+        df_features = df[features]
+        X_test_scaled = scaler.transform(df_features)
+        y_pred = model.predict(X_test_scaled)
+        return pd.Series(y_pred)
     def train_logistic_regression_model(self, df_train,features, target):
         
         # Create features and target
@@ -51,56 +60,72 @@ class LogisticRegressionHelper():
 
         # # Split the data
         X_train, X_test, y_train, y_test = train_test_split(df_features, target, test_size=0.4, random_state=42)
-       
+        print(len(y_test))
         # Standardize the features
         scaler = StandardScaler()
-        scaler.fit_transform(df_features)
-        X_train_scaled = scaler.transform(X_train)
+        #scaler.fit_transform(df_features)
+        X_train_scaled = scaler.fit_transform(X_train)
         X_test_scaled = scaler.transform(X_test)
-        c=0.1
+        with open('scaler_lr.pkl','wb') as file:
+            pickle.dump(scaler,file)
 
-        clf = [
-        LogisticRegression(solver='newton-cg',penalty='l2',max_iter=200,C=c,class_weight='balanced'),
-        LogisticRegression(solver='lbfgs',penalty='l2',max_iter=200,C=c,class_weight='balanced'),
-        LogisticRegression(solver='sag',penalty='l2',max_iter=200,C=c,class_weight='balanced'),
-        LogisticRegression(solver='saga',penalty='l2',max_iter=200,C=c,class_weight='balanced'),
-        LogisticRegression(solver='liblinear',penalty='l1',max_iter=200,C=c,class_weight='balanced')
-        ]
-        clf_columns = []
-        clf_compare = pd.DataFrame(columns = clf_columns+ ['y_test', 'predicted'])
+        #Define the parameter grid
+        param_grid = {
+            'solver': ['newton-cg','lbfgs','sag','saga','liblinear'], #,[ 1000,2000], #200,500,1000
+            'C': [0.001, 0.001,0.01,0.1,1], #[0.2], #[0.01, 0.1, 0.2]
+        }
       
-        row_index = 0
-        for alg in clf:
-                
-            predicted = alg.fit(X_train_scaled, y_train).predict(X_test_scaled)
-           
-
-           
-            #fp, tp, th = roc_curve(y_test, predicted)
-            clf_name = alg.__class__.__name__
-            clf_compare.loc[row_index, 'Train Accuracy'] = round(alg.score(X_train, y_train), 5)
-            clf_compare.loc[row_index, 'Test Accuracy'] = round(alg.score(X_test, y_test), 5)
-            clf_compare.loc[row_index, 'Precission'] = round(precision_score(y_test, predicted, average='macro'),5)
-            clf_compare.loc[row_index, 'Recall'] = round(recall_score(y_test, predicted, average='macro'),5)
-            clf_compare.loc[row_index, 'f1'] = round(f1_score(y_test, predicted, average='macro'),5)
-            clf_compare.at[row_index, 'y_test'] = list(y_test)
-            clf_compare.at[row_index, 'predicted'] = list(predicted)
-
-            row_index+=1
-            
-        clf_compare.sort_values(by = ['f1'], ascending = False, inplace = True)    
         
-        print(clf_compare[['Train Accuracy','Test Accuracy','Precission','Recall','f1']])
-        plt_helper = plots.PlotHelper()
-        plt_helper.plot_confusion_matrix(clf_compare.loc[0]["y_test"],clf_compare.iloc[0]["predicted"])
-       
+         
+        # Initialize the Logistic Regressor
+        lr = LogisticRegression(penalty='l2',max_iter=200,class_weight='balanced')
 
-        return clf, scaler
+        # Initialize GridSearchCV
+        grid_search = GridSearchCV(estimator=lr, param_grid=param_grid,scoring='f1')
+        
+        grid_search.fit(X_train_scaled, y_train)#
+
+        # Get the best parameters
+        best_params = grid_search.best_params_
+        print(f'Best parameters: {best_params}')
+
+        # Train the model with the best parameters
+        best_lr = grid_search.best_estimator_
+
+        with open('logistic_model.pkl', 'wb') as file:
+            pickle.dump(best_lr, file)
+
+        # Make predictions
+        y_pred = best_lr.predict(X_test_scaled)
+        
+        # Evaluate the model
+        print(f'Train Accuracy: {round(best_lr.score(X_train, y_train), 5)}')
+        print(f'Test Accuracy: {round(best_lr.score(X_test, y_test), 5)}')
+        print(f'Precission: {round(precision_score(y_test, y_pred, average='macro'), 5)}')
+        print(f'Recall: {round(recall_score(y_test, y_pred, average='macro'), 5)}')
+        print(f'f1: {round(f1_score(y_test, y_pred, average='macro'), 5)}')
+
+       
+        plt_helper = plots.PlotHelper()
+        plt_helper.plot_confusion_matrix(y_test,y_pred)
+                
+        return best_lr, scaler
+
+
 
 class GradientBoostClassifierHelper(): 
 
     def predict_signals(self,model,scaler,df,features):
 
+        df_features = df[features]
+        X_test_scaled = scaler.transform(df_features)
+        y_pred = model.predict(X_test_scaled)
+        return pd.Series(y_pred)
+    def predict_signals_from_saved_model(self,df,features):
+        with open('scaler_gb.pkl','rb') as f:
+            scaler = pickle.load(f)
+        with open('best_gradient_boost_model.pkl', 'rb') as file:
+            model = pickle.load(file)
         df_features = df[features]
         X_test_scaled = scaler.transform(df_features)
         y_pred = model.predict(X_test_scaled)
@@ -120,7 +145,8 @@ class GradientBoostClassifierHelper():
         scaler = StandardScaler()
         X_train_scaled = scaler.fit_transform(X_train)
         X_test_scaled = scaler.transform(X_test)
-
+        with open('scaler_gb.pkl','wb') as file:
+            pickle.dump(scaler,file)
        
 
         #Define the parameter grid
@@ -137,7 +163,7 @@ class GradientBoostClassifierHelper():
         gbm = GradientBoostingClassifier(random_state=42)
 
         # Initialize GridSearchCV
-        grid_search = GridSearchCV(estimator=gbm, param_grid=param_grid)
+        grid_search = GridSearchCV(estimator=gbm, param_grid=param_grid, scoring='f1')
 
         # The GradientBoostingClassifier in scikit-learn does not directly support the class_weight
         #class_weight = y_train.value_counts(normalize=True).to_dict()
@@ -153,12 +179,14 @@ class GradientBoostClassifierHelper():
         # Train the model with the best parameters
         best_gbm = grid_search.best_estimator_
 
+        with open('gradient_boost_model.pkl', 'wb') as file:
+            pickle.dump(best_gbm, file)
+
         # Make predictions
         y_pred = best_gbm.predict(X_test_scaled)
 
         # Evaluate the model
-        mse = mean_squared_error(y_test, y_pred)
-        print(f'Mean Squared Error after tuning: {mse}')
+         
         print(f'Train Accuracy: {round(best_gbm.score(X_train, y_train), 5)}')
         print(f'Test Accuracy: {round(best_gbm.score(X_test, y_test), 5)}')
         print(f'Precission: {round(precision_score(y_test, y_pred, average='macro'), 5)}')
@@ -172,42 +200,6 @@ class GradientBoostClassifierHelper():
         return best_gbm, scaler
 
 
-class KerasClassifier(BaseEstimator, ClassifierMixin):
-    def __init__(self, units=50, learning_rate=0.01, dropout_rate=0.2, epochs=10, batch_size=32, verbose=0):
-        self.units = units
-        self.learning_rate = learning_rate
-        self.dropout_rate = dropout_rate
-        self.epochs = epochs
-        self.batch_size = batch_size
-        self.verbose = verbose
-        self.model_ = None
-
-    def create_model(self):
-        model = Sequential()
-        model.add(LSTM(units=self.units, return_sequences=True, input_shape=(3,1)))
-        model.add(LSTM(units=self.units, dropout=self.dropout_rate))
-        model.add(Dense(3, activation='softmax'))  # 3 classes: buy, sell, neutral
-
-        optimizer = Adam(learning_rate=self.learning_rate)
-        model.compile(optimizer=optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-        return model
-
-    def fit(self, X, y):
-        self.model_ = self.create_model()
-        self.model_.fit(X, y, epochs=self.epochs, batch_size=self.batch_size, verbose=self.verbose)
-        return self
-
-    def predict(self, X):
-        predictions = self.model_.predict(X)
-        return predictions.argmax(axis=-1)
-
-    def score(self, X, y):
-        y_pred = self.predict(X)
-        precision = precision_score(y, y_pred, average='macro')
-        recall = recall_score(y, y_pred, average='macro')
-        f1 = f1_score(y, y_pred, average='macro')
-        return f1  # Returning F1-score for optimization
-    
 class LongShortTermMemoryMLHelper(): 
     def __init__(self): 
         self.dataset1 = []
@@ -353,7 +345,7 @@ The optimal L2 regularization for the Dense layer is {best_hps.get('l2_dense')}.
         optimizer = Adam(learning_rate=learning_rate)
         model.compile(optimizer=optimizer, loss='mse')
         return model
-    def train_lstm_model_1(self, df_train,features, target, time_step=28):
+ 
        
         df_features = df_train[features]
         target = df_train[target]  
@@ -500,9 +492,11 @@ The optimal L2 regularization for the Dense layer is {best_hps.get('l2_dense')}.
         y_pred_classes = np.argmax(y_pred, axis=1)
         shifted_class_vector_y_pred = y_pred_classes - 1
         #y_test_classes = np.argmax(y_test, axis=1)
-        print(f'Final Precission: {round(precision_score( np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
-        print(f'Final Recall: {round(recall_score(np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
-        print(f'Final f1: {round(f1_score(np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
+        
+        #print(f'Final Test Accuracy: {round(accuracy_score(np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
+        print(f'Final Test Precission: {round(precision_score( np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
+        print(f'Final Test Recall: {round(recall_score(np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
+        print(f'Final Test F1: {round(f1_score(np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
         return  self.model, scaler
        
     def predict_signals(self,model,scaler,df,features):
