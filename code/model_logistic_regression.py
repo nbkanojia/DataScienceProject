@@ -101,11 +101,13 @@ class LogisticRegressionHelper():
         # Evaluate the model
         print(f'Train Accuracy: {round(best_lr.score(X_train, y_train), 5)}')
         print(f'Test Accuracy: {round(best_lr.score(X_test, y_test), 5)}')
-        print(f'Precission: {round(precision_score(y_test, y_pred, average='macro'), 5)}')
-        print(f'Recall: {round(recall_score(y_test, y_pred, average='macro'), 5)}')
-        print(f'f1: {round(f1_score(y_test, y_pred, average='macro'), 5)}')
-
-       
+        ps = precision_score(y_test, y_pred, average='weighted')
+        print(f'Precission: {round(ps, 5)}')
+        rs = recall_score(y_test, y_pred, average='weighted')
+        print(f'Recall: {round(rs, 5)}')
+        f1s = f1_score(y_test, y_pred, average='weighted')
+        print(f'f1: {round(f1s, 5)}')
+  
         plt_helper = plots.PlotHelper()
         plt_helper.plot_confusion_matrix(y_test,y_pred)
                 
@@ -189,9 +191,12 @@ class GradientBoostClassifierHelper():
          
         print(f'Train Accuracy: {round(best_gbm.score(X_train, y_train), 5)}')
         print(f'Test Accuracy: {round(best_gbm.score(X_test, y_test), 5)}')
-        print(f'Precission: {round(precision_score(y_test, y_pred, average='macro'), 5)}')
-        print(f'Recall: {round(recall_score(y_test, y_pred, average='macro'), 5)}')
-        print(f'f1: {round(f1_score(y_test, y_pred, average='macro'), 5)}')
+        ps = precision_score(y_test, y_pred, average='weighted')
+        print(f'Precission: {round(ps, 5)}')
+        rs = recall_score(y_test, y_pred, average='weighted')
+        print(f'Recall: {round(rs, 5)}')
+        f1s = f1_score(y_test, y_pred, average='weighted')
+        print(f'f1: {round(f1s, 5)}')
 
        
         plt_helper = plots.PlotHelper()
@@ -480,9 +485,13 @@ The optimal L2 regularization for the Dense layer is {best_hps.get('l2_dense')}.
             #print(f'Train Accuracy: {round(self.model.score(X_train_inner, y_train_inner), 5)}')
             #print(f'Test Accuracy: {round(self.model.score(X_test_inner, shifted_class_vector_y_pred), 5)}')
 
-            print(f'Precission: {round(precision_score( np.argmax(y_test_inner, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
-            print(f'Recall: {round(recall_score(np.argmax(y_test_inner, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
-            print(f'f1: {round(f1_score(np.argmax(y_test_inner, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
+        
+            ps = precision_score(np.argmax(y_test_inner, axis=1)- 1, shifted_class_vector_y_pred, average='weighted')
+            print(f'Precission: {round(ps, 5)}')
+            rs = recall_score(np.argmax(y_test_inner, axis=1)- 1, shifted_class_vector_y_pred,average='weighted')
+            print(f'Recall: {round(rs, 5)}')
+            f1s = f1_score(np.argmax(y_test_inner, axis=1)- 1, shifted_class_vector_y_pred, average='weighted')
+            print(f'f1: {round(f1s, 5)}')
 
         #just split for overall test and check the scores
         _, X_test, _, y_test = train_test_split(X_scaled, y_encoded, test_size=0.4, shuffle=False)
@@ -494,9 +503,12 @@ The optimal L2 regularization for the Dense layer is {best_hps.get('l2_dense')}.
         #y_test_classes = np.argmax(y_test, axis=1)
         
         #print(f'Final Test Accuracy: {round(accuracy_score(np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
-        print(f'Final Test Precission: {round(precision_score( np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
-        print(f'Final Test Recall: {round(recall_score(np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
-        print(f'Final Test F1: {round(f1_score(np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
+        ps = precision_score(np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='weighted')
+        print(f'Final Test Precission: {round(ps, 5)}')
+        rs = recall_score(np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred,average='weighted')
+        print(f'Final Test Recall: {round(rs, 5)}')
+        f1s = f1_score(np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='weighted')
+        print(f'Final Test f1: {round(f1s, 5)}')
         return  self.model, scaler
        
     def predict_signals(self,model,scaler,df,features):
@@ -868,12 +880,12 @@ The optimal L2 regularization for the Dense layer is {best_hps.get('l2_dense')}.
             #print(f'Train Accuracy: {round(self.model.score(X_train_inner, y_train_inner), 5)}')
             #print(f'Test Accuracy: {round(self.model.score(X_test_inner, shifted_class_vector_y_pred), 5)}')
 
-            print(f'Precission: {round(precision_score( np.argmax(y_test_inner, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
-            print(f'Recall: {round(recall_score(np.argmax(y_test_inner, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
-            print(f'f1: {round(f1_score(np.argmax(y_test_inner, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
-            # print("Precission: " + round(precision_score(y_test, y_pred, average='macro')))
-            # print("Recall: " + round(recall_score(y_test, y_pred, average='macro')))
-            # print("f1: " + round(f1_score(y_test, y_pred, average='macro')))
+            ps = precision_score(np.argmax(y_test_inner, axis=1)- 1, shifted_class_vector_y_pred, average='weighted')
+            print(f'Precission: {round(ps, 5)}')
+            rs = recall_score(np.argmax(y_test_inner, axis=1)- 1, shifted_class_vector_y_pred,average='weighted')
+            print(f'Recall: {round(rs, 5)}')
+            f1s = f1_score(np.argmax(y_test_inner, axis=1)- 1, shifted_class_vector_y_pred, average='weighted')
+            print(f'f1: {round(f1s, 5)}')
 
 
         # Step 5: Evaluate and Predict
@@ -882,9 +894,11 @@ The optimal L2 regularization for the Dense layer is {best_hps.get('l2_dense')}.
         y_pred_classes = np.argmax(y_pred, axis=1)
         shifted_class_vector_y_pred = y_pred_classes - 1
         #y_test_classes = np.argmax(y_test, axis=1)
-        print(f'Final Precission: {round(precision_score( np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
-        print(f'Final Recall: {round(recall_score(np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
-        print(f'Final f1: {round(f1_score(np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='macro'), 5)}')
+        ps = precision_score(np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='weighted')
+        print(f'Final Test Precission: {round(ps, 5)}')
+        rs = recall_score(np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred,average='weighted')
+        print(f'Final Test Recall: {round(rs, 5)}')
+        f1s = f1_score(np.argmax(y_test, axis=1)- 1, shifted_class_vector_y_pred, average='weighted')
         return  self.model, scaler
        
 
